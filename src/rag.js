@@ -68,6 +68,7 @@ Answer:
 
     // 6️⃣ 返回生成的文本
     console.log("数据:", data)
+    console.log("数据:", data?.candidates?.[0]?.content?.parts)
     // Gemini 返回结构是 content.parts[].text，而不是 content[0].text
     return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No answer";
 }
