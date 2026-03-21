@@ -1,0 +1,6 @@
+RAG stands for Retrieval-Augmented Generation.
+It improves LLM responses by retrieving relevant documents.
+
+Cloud Run is a serverless platform on Google Cloud that allows you to deploy containerized applications.
+
+BigQuery is a data warehouse solution for analytics.
