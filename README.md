@@ -68,11 +68,20 @@ gcloud run deploy ask-api \
   --source . \
   --region australia-southeast1 \
   --allow-unauthenticated \
+  --clear-base-image \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=australia-southeast1,GEMINI_MODEL=gemini-1.5-flash-002"
+```
+
+PowerShell（一行）：
+
+```powershell
+gcloud run deploy ask-api --source . --region australia-southeast1 --allow-unauthenticated --clear-base-image --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=australia-southeast1,GEMINI_MODEL=gemini-1.5-flash-002"
 ```
 
 说明：
 
+- 若报错 `Missing required argument [--clear-base-image]`：说明服务曾用过与 Dockerfile 不兼容的「基础镜像」配置，**加上 `--clear-base-image`** 再部署。
+- 若 **Build failed**：`gcloud deploy --source` 会按 **`.gitignore`** 打包上传。若曾把 **`package-lock.json` 写进 .gitignore**，上传里没有 lock 文件，`Dockerfile` 里 `COPY package-lock.json` / `npm ci` 会失败。请保证 **`package-lock.json` 不被忽略且存在于项目根目录**，再重新部署；详细日志见 Cloud Build 控制台链接。
 - `--source .`：用仓库里的 **Dockerfile** 构建并部署（镜像内**不含** `.env` / `key.json`）。
 - Cloud Run 会自动注入 **`K_SERVICE`**，应用会走 **Vertex**；不要把 `GOOGLE_API_KEY` 写进 `--set-env-vars`（易泄露），本地开发再用即可。
 - 若某区域模型 404，把 `GOOGLE_CLOUD_LOCATION` 改为 `us-central1` 并调整 `GEMINI_MODEL`（见上文）。

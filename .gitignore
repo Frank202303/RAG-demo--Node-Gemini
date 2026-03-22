@@ -44,7 +44,7 @@ Desktop.ini
 dist/
 build/
 
-# Optional lock files
-package-lock.json
+# 不要忽略 package-lock.json：gcloud deploy --source 会按 .gitignore 打包，
+# 若缺少 lock 文件，Dockerfile 里 npm ci 会在 Cloud Build 中失败。
 yarn.lock
 pnpm-lock.yaml
