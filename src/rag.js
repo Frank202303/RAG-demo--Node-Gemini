@@ -15,7 +15,7 @@ export async function askRAG(question) {
     // 2️⃣ 切分成 chunks
     const chunks = splitIntoChunks(text);
 
-    // 3️⃣ 检索相关 chunks
+    // 3️⃣ 检索相关 chunks  ！！RAG 里 Retrieval 负责「找材料」，
     const relevantChunks = retrieveRelevantChunks(chunks, question);
 
     // 4️⃣ 拼接上下文
@@ -33,6 +33,7 @@ ${question}
 Answer:
 `;
 
+    // Generation（Gemini）负责「根据材料回答问题」。
     // 5️⃣ 调用 Google Generative AI API
     const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GOOGLE_API_KEY}`;
 
@@ -67,8 +68,8 @@ Answer:
     // 如果你愿意，我可以顺手再帮你加一个小的 health 接口和请求日志，后面排查这类问题会更快。
 
     // 6️⃣ 返回生成的文本
-    console.log("数据:", data)
-    console.log("数据:", data?.candidates?.[0]?.content?.parts)
+    // console.log("数据:", data)
+    // console.log("数据:", data?.candidates?.[0]?.content?.parts)
     // Gemini 返回结构是 content.parts[].text，而不是 content[0].text
     return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No answer";
 }
