@@ -1,24 +1,36 @@
-// rag-fetch.js
-import fetch from "node-fetch"; // 确保已经 npm install node-fetch
+import fs from "fs";
+import { VertexAI } from "@google-cloud/vertexai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { loadDocuments } from "./loader.js";
 import { splitIntoChunks, retrieveRelevantChunks } from "./retriever.js";
 
+/** 仅当显式设置了 JSON 路径时检查文件存在（Cloud Run 通常不设此变量，靠服务账号 ADC） */
+function assertVertexCredentialsFileIfSet() {
+    const p = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!p) return;
+    if (!fs.existsSync(p)) {
+        throw new Error(
+            `找不到凭证文件：${p}\n请把 GOOGLE_APPLICATION_CREDENTIALS 改成你本机服务账号 JSON 的**真实路径**（文档里的 C:\\path\\to\\key.json 只是示例，不能直接照抄）。`
+        );
+    }
+}
+
+/** 从 Vertex / Gemini 响应里取出第一段文本 */
+function extractTextFromResponse(response) {
+    const part = response?.candidates?.[0]?.content?.parts?.[0];
+    return part?.text ?? null;
+}
+
 /**
- * 使用 Google Generative AI API + RAG 流程回答问题
- * @param {string} question
- * @returns {Promise<string>}
+ * - Cloud Run：默认走 Vertex（K_SERVICE 存在 + GOOGLE_CLOUD_PROJECT）。
+ * - 本地：若 .env 里有 GEMINI_API_KEY / GOOGLE_API_KEY，**优先走 AI Studio**，
+ *   即使你 Shell 里还设了 GOOGLE_CLOUD_PROJECT（避免 Vertex 模型/区域 404 把本地卡死）。
+ * - 本地强制 Vertex：USE_VERTEX_AI=true，且不要依赖 API Key；或从环境里去掉 GOOGLE_API_KEY。
  */
 export async function askRAG(question) {
-    // 1️⃣ Load 文档
     const text = await loadDocuments();
-
-    // 2️⃣ 切分成 chunks
     const chunks = splitIntoChunks(text);
-
-    // 3️⃣ 检索相关 chunks  ！！RAG 里 Retrieval 负责「找材料」，
     const relevantChunks = retrieveRelevantChunks(chunks, question);
-
-    // 4️⃣ 拼接上下文
     const context = relevantChunks.join("\n");
 
     const prompt = `
@@ -31,45 +43,65 @@ Question:
 ${question}
 
 Answer:
-`;
+`.trim();
 
-    // Generation（Gemini）负责「根据材料回答问题」。
-    // 5️⃣ 调用 Google Generative AI API
-    const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GOOGLE_API_KEY}`;
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+    const location =
+        process.env.GOOGLE_CLOUD_LOCATION || "australia-southeast1";
+    const apiKey =
+        process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-    const body = {
-        contents: [{ role: "user", parts: [{ text: prompt }] }]
-    };
+    const forceApiKey = process.env.USE_GEMINI_API_KEY === "true";
+    const forceVertex = process.env.USE_VERTEX_AI === "true";
+    const onCloudRun = Boolean(process.env.K_SERVICE);
 
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-    });
+    /** 是否走 Vertex：Cloud Run 或显式 USE_VERTEX_AI；本地同时有 API Key 时默认不走 Vertex */
+    const useVertex = (() => {
+        if (forceApiKey) return false;
+        if (!projectId) return false;
+        if (!apiKey) return true;
+        if (onCloudRun || forceVertex) return true;
+        return false;
+    })();
 
-    const data = await res.json();
+    // Vertex 须带版本后缀；AI Studio 常用短名（无 -001）
+    const modelId =
+        process.env.GEMINI_MODEL ||
+        (useVertex ? "gemini-1.5-flash-002" : "gemini-2.0-flash");
 
-    if (!res.ok) {
-        const errMsg = data?.error?.message || `Gemini API error: ${res.status}`;
-        throw new Error(errMsg);
+    if (useVertex) {
+        assertVertexCredentialsFileIfSet();
+        const vertex = new VertexAI({ project: projectId, location });
+        const model = vertex.getGenerativeModel({ model: modelId });
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }]
+        });
+        const textOut = extractTextFromResponse(result.response);
+        if (!textOut) {
+            throw new Error(
+                "Vertex AI returned empty response. Check model name and IAM (Vertex AI User)."
+            );
+        }
+        return textOut;
     }
-    //     问题已经定位并修好，主要有两个点：
-    // Gemini 返回文本的解析路径写错了。你原来用的是 content[0].text，但实际结构是 content.parts[0].text，所以一直走到了 "No answer"。
-    // 本机当时还有旧的 node src/index.js 进程在跑，导致你请求到的可能是旧代码版本。重启后才生效。
-    // 我修改了 src/rag.js：
-    // 把返回解析改为 data?.candidates?.[0]?.content?.parts?.[0]?.text
-    // 增加了 res.ok 检查，Gemini 非 2xx 时会抛出明确错误信息，避免“静默失败”
-    // 现在我本地复测你的请求：
-    // POST http://localhost:3000/ask
-    // body:
-    // {  "question": "What is BigQuery?"}
-    // 返回已正确：
-    // {"answer":"BigQuery is a data warehouse solution for analytics."}
-    // 如果你愿意，我可以顺手再帮你加一个小的 health 接口和请求日志，后面排查这类问题会更快。
 
-    // 6️⃣ 返回生成的文本
-    // console.log("数据:", data)
-    // console.log("数据:", data?.candidates?.[0]?.content?.parts)
-    // Gemini 返回结构是 content.parts[].text，而不是 content[0].text
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No answer";
+    if (apiKey) {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelId });
+        const result = await model.generateContent(prompt);
+        const textOut =
+            typeof result.response.text === "function"
+                ? result.response.text()
+                : extractTextFromResponse(result.response);
+        if (!textOut) {
+            throw new Error(
+                "Gemini (API key) returned empty response. Check GEMINI_API_KEY and model name."
+            );
+        }
+        return textOut;
+    }
+
+    throw new Error(
+        "未配置鉴权：本地可在 .env 设置 GOOGLE_API_KEY；Vertex 需 GOOGLE_CLOUD_PROJECT + ADC，Cloud Run 上可设 USE_VERTEX_AI=true。"
+    );
 }

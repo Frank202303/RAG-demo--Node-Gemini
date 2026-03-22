@@ -25,6 +25,10 @@ coverage/
 .env.local
 .env.*.local
 
+# GCP 服务账号密钥（切勿提交）
+key.json
+*-sa.json
+
 # VSCode settings
 .vscode/
 
