@@ -51,7 +51,7 @@ npm start
 
 **Cloud Run：**
 
-1. 在 Cloud Run 服务里设置环境变量：`GOOGLE_CLOUD_PROJECT`、`GOOGLE_CLOUD_LOCATION`（可选，默认可用 `australia-southeast1`）、`GEMINI_MODEL`（可选）
+1. 在 Cloud Run 服务里设置环境变量：`GOOGLE_CLOUD_PROJECT`、**`GOOGLE_CLOUD_LOCATION=us-central1`**（Vertex 调用区域）、`GEMINI_MODEL`（如 **`gemini-2.5-flash-lite`**）
 2. **不要**把 `GOOGLE_APPLICATION_CREDENTIALS` 打进镜像；使用 Cloud Run **默认服务账号**或你指定的服务账号
 3. 给该服务账号授予 **`Vertex AI User`**（`roles/aiplatform.user`）
 
@@ -69,14 +69,22 @@ gcloud run deploy ask-api \
   --region australia-southeast1 \
   --allow-unauthenticated \
   --clear-base-image \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=australia-southeast1,GEMINI_MODEL=gemini-1.5-flash-002"
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=us-central1,GEMINI_MODEL=gemini-2.5-flash-lite"
 ```
 
 PowerShell（一行）：
 
 ```powershell
-gcloud run deploy ask-api --source . --region australia-southeast1 --allow-unauthenticated --clear-base-image --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=australia-southeast1,GEMINI_MODEL=gemini-1.5-flash-002"
+gcloud run deploy ask-api --source . --region australia-southeast1 --allow-unauthenticated --clear-base-image --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=us-central1,GEMINI_MODEL=gemini-2.5-flash-lite"
 ```
+
+**已部署的服务只改环境变量（不用重新构建镜像）**：
+
+```powershell
+gcloud run services update ask-api --region australia-southeast1 --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=us-central1,GEMINI_MODEL=gemini-2.5-flash-lite"
+```
+
+若仍 404：在控制台 **Vertex → Model Garden** 确认账号可用模型；或改 **`GEMINI_MODEL=gemini-2.5-flash`** / **`gemini-2.0-flash-001`**。可选尝试 **`GOOGLE_CLOUD_LOCATION=global`**（代码会修正 `apiEndpoint`），见 [Locations](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations)。
 
 说明：
 
@@ -84,7 +92,8 @@ gcloud run deploy ask-api --source . --region australia-southeast1 --allow-unaut
 - 若 **Build failed**：`gcloud deploy --source` 会按 **`.gitignore`** 打包上传。若曾把 **`package-lock.json` 写进 .gitignore**，上传里没有 lock 文件，`Dockerfile` 里 `COPY package-lock.json` / `npm ci` 会失败。请保证 **`package-lock.json` 不被忽略且存在于项目根目录**，再重新部署；详细日志见 Cloud Build 控制台链接。
 - `--source .`：用仓库里的 **Dockerfile** 构建并部署（镜像内**不含** `.env` / `key.json`）。
 - Cloud Run 会自动注入 **`K_SERVICE`**，应用会走 **Vertex**；不要把 `GOOGLE_API_KEY` 写进 `--set-env-vars`（易泄露），本地开发再用即可。
-- 若某区域模型 404，把 `GOOGLE_CLOUD_LOCATION` 改为 `us-central1` 并调整 `GEMINI_MODEL`（见上文）。
+- **`--region australia-southeast1`**：容器跑在悉尼。**`GOOGLE_CLOUD_LOCATION`**：Vertex **调用 Gemini 的 API 区域**，与容器无关；推荐先试 **`us-central1`** + **`gemini-2.5-flash-lite`**。部分项目在 **`global`** 上对 Publisher 模型会 **404**，与是否修正 `apiEndpoint` 无关。
+- 若设 **`GOOGLE_CLOUD_LOCATION=global`**：旧版 SDK会误连 `global-aiplatform.googleapis.com`（HTML → `Unexpected token '<'`），代码已对 **`global`** 自动加 **`apiEndpoint: aiplatform.googleapis.com`**。
 - 部署完成后终端会打印 **服务 URL**，用 Postman `POST https://你的地址/ask`，body：`{"question":"..."}`。
 
 也可用控制台：**Cloud Run → 创建服务 → 从源代码仓库或本地上传**，并同样在「变量」里配置 `GOOGLE_CLOUD_PROJECT` 等。
@@ -110,12 +119,7 @@ gcloud run deploy ask-api --source . --region australia-southeast1 --allow-unaut
 
 ### Vertex 报 404：`Publisher Model ... was not found`
 
-说明 **当前 `GOOGLE_CLOUD_LOCATION` 下没有该模型**（区域与模型要匹配）。与 **Google AI Studio** 里的名字也可能不一致。
-
-- 默认模型为 **`gemini-1.5-flash-002`**（在 `australia-southeast1` 一般可用）。
-- 若要用 **`gemini-2.0-flash-001`** 等较新模型，常在 **`us-central1`** 才可用，可设：  
-  `GOOGLE_CLOUD_LOCATION=us-central1` + `GEMINI_MODEL=gemini-2.0-flash-001`。
-- 查可用性：[Vertex 模型与区域](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions)。
+说明 **当前 Vertex 区域 + 模型 ID** 组合不可用。请改 **`GOOGLE_CLOUD_LOCATION=us-central1`** 并试 **`GEMINI_MODEL=gemini-2.5-flash-lite`**（或 **`gemini-2.5-flash`**）。见 [Model versions](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions)。
 
 ---
 

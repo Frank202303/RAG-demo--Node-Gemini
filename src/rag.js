@@ -46,8 +46,13 @@ Answer:
 `.trim();
 
     const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+    // Vertex「API 区域」≠ Cloud Run 部署区域。部分项目在 locations/global 上对 Publisher 模型会长期 404；
+    // 默认改用 us-central1（与 @google-cloud/vertexai 默认一致），更常见可用。
+    // 若要用 global：设 GOOGLE_CLOUD_LOCATION=global（代码会配 apiEndpoint: aiplatform.googleapis.com）。
     const location =
-        process.env.GOOGLE_CLOUD_LOCATION || "australia-southeast1";
+        process.env.GEMINI_VERTEX_LOCATION ||
+        process.env.GOOGLE_CLOUD_LOCATION ||
+        "us-central1";
     const apiKey =
         process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
@@ -64,14 +69,26 @@ Answer:
         return false;
     })();
 
-    // Vertex 须带版本后缀；AI Studio 常用短名（无 -001）
+    // Vertex：用当前文档中的稳定模型 ID（见 model-versions）。2.0-flash-001 在部分账号/global 下会 404。
+    // AI Studio（API Key）仍可用短名 gemini-2.0-flash。
     const modelId =
         process.env.GEMINI_MODEL ||
-        (useVertex ? "gemini-1.5-flash-002" : "gemini-2.0-flash");
+        (useVertex ? "gemini-2.5-flash-lite" : "gemini-2.0-flash");
 
     if (useVertex) {
         assertVertexCredentialsFileIfSet();
-        const vertex = new VertexAI({ project: projectId, location });
+        // location=global 时，SDK 默认会请求 global-aiplatform.googleapis.com（无效，返回 HTML → JSON 解析报错）。
+        // 官方 global 端点主机为 aiplatform.googleapis.com，见：
+        // https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations
+        const vertexInit =
+            location === "global"
+                ? {
+                      project: projectId,
+                      location: "global",
+                      apiEndpoint: "aiplatform.googleapis.com"
+                  }
+                : { project: projectId, location };
+        const vertex = new VertexAI(vertexInit);
         const model = vertex.getGenerativeModel({ model: modelId });
         const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }]
