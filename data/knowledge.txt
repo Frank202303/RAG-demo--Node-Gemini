@@ -1,6 +1,40 @@
 RAG stands for Retrieval-Augmented Generation.
-It improves LLM responses by retrieving relevant documents.
+It improves LLM responses by retrieving relevant documents before generating answers.
 
 Cloud Run is a serverless platform on Google Cloud that allows you to deploy containerized applications.
+It automatically scales based on incoming traffic and only charges for actual usage.
 
-BigQuery is a data warehouse solution for analytics.
+BigQuery is a fully managed data warehouse solution for large-scale analytics.
+It allows you to run SQL queries on massive datasets with high performance.
+
+Vertex AI is a machine learning platform on Google Cloud that provides tools for training, deploying, and managing ML models.
+It also supports generative AI models like Gemini for text and multimodal tasks.
+
+Docker is a containerization platform that packages applications and their dependencies into lightweight containers.
+It ensures consistency across development, testing, and production environments.
+
+PostgreSQL is an open-source relational database known for its reliability and advanced SQL features.
+It is widely used in backend systems for storing structured data.
+
+REST API is a web service architecture that allows communication between systems using HTTP methods such as GET, POST, PUT, and DELETE.
+
+GraphQL is a query language for APIs that allows clients to request only the data they need.
+It improves efficiency compared to traditional REST APIs.
+
+Node.js is a JavaScript runtime that allows you to run JavaScript on the server side.
+It is commonly used for building scalable backend services.
+
+Next.js is a React framework that enables server-side rendering and static site generation.
+It is widely used for building modern web applications.
+
+AWS ECS (Elastic Container Service) is a container orchestration service that allows you to run Docker containers on AWS infrastructure.
+
+CI/CD stands for Continuous Integration and Continuous Deployment.
+It automates the process of building, testing, and deploying applications.
+
+Authentication is the process of verifying a user's identity.
+Authorization determines what actions a user is allowed to perform after authentication.
+
+PII (Personally Identifiable Information) refers to sensitive personal data that can identify an individual, such as name, email, or phone number.
+
+Data residency refers to the requirement that data must be stored within a specific geographic location due to legal or compliance reasons.

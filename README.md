@@ -123,4 +123,16 @@ gcloud run services update ask-api --region australia-southeast1 --set-env-vars 
 
 ---
 
+1. npm start: http://localhost:3000/ask  Working!!!
+  Body: {
+  "question": "What is BigQuery?"
+  }
+2. deploy CMD: 
+   gcloud run deploy ask-api --source . --region australia-southeast1 --allow-unauthenticated --clear-base-image --set-env-vars "GOOGLE_CLOUD_PROJECT=ask-ai-api-2026,GOOGLE_CLOUD_LOCATION=us-central1,GEMINI_MODEL=gemini-2.5-flash-lite"
+     Body: {
+  "question": "What is BigQuery?"
+  }
+ POSTMAN: 
+   https://ask-api-32967898766.australia-southeast1.run.app/ask   WORKING!!!
+
 一键杀所有 Node（慎用）：`taskkill /IM node.exe /F`
